@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* Bidirectional chat ↔ timeline focus flash (see LinkRegistry). */
+.flash-highlight {
+  animation: flash-highlight 1.6s ease-out;
+}
+
+@keyframes flash-highlight {
+  0% {
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0);
+  }
+}

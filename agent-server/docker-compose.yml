@@ -1,0 +1,8 @@
+services:
+  agent-server:
+    build: .
+    ports:
+      - "4747:4747"
+    environment:
+      # normal | chaos
+      - MODE=${MODE:-normal}

@@ -1,0 +1,13 @@
+{
+  "name": "agent-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "start:chaos": "node server.js --mode chaos"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
