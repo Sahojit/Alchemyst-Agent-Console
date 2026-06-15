@@ -40,6 +40,17 @@ const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 const rid = (prefix) => `${prefix}_${crypto.randomBytes(4).toString("hex")}`;
 
 // --------------------------------------------------------------------------
+// Client event log — used by GET /log for protocol compliance verification.
+// Records every inbound frame from the client with ISO timestamps so the
+// evaluator can check PONG latency, TOOL_ACK timing, and RESUME correctness.
+// --------------------------------------------------------------------------
+const clientLog = [];
+
+function recordClient(entry) {
+  clientLog.push({ ...entry, ts: new Date().toISOString() });
+}
+
+// --------------------------------------------------------------------------
 // Session state (survives reconnects)
 // --------------------------------------------------------------------------
 const session = {
@@ -310,12 +321,22 @@ async function respond(content) {
 // HTTP + WebSocket server
 // --------------------------------------------------------------------------
 const httpServer = createServer((req, res) => {
-  // Health check endpoint for Render / load balancers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
   if (req.method === "GET" && req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true, mode: MODE }));
     return;
   }
+
+  // Protocol compliance log — every inbound client frame with timestamps.
+  // Evaluators use this to verify PONG latency, TOOL_ACK timing, and RESUME.
+  if (req.method === "GET" && req.url === "/log") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(clientLog, null, 2));
+    return;
+  }
+
   res.writeHead(404);
   res.end("Not found");
 });
@@ -347,19 +368,23 @@ wss.on("connection", (ws) => {
         const last = Number.isFinite(Number(msg.last_seq)) ? Number(msg.last_seq) : 0;
         const replay = session.log.filter((f) => f.seq > last);
         log(`RESUME last_seq=${last} → replaying ${replay.length} frames`);
+        recordClient({ type: "RESUME", last_seq: last, replay_count: replay.length });
         for (const frame of replay) rawSend(ws, frame); // replay is in-order even in chaos
         break;
       }
       case "USER_MESSAGE":
         if (typeof msg.content === "string") {
           log(`USER_MESSAGE: ${msg.content}`);
+          recordClient({ type: "USER_MESSAGE", content: msg.content });
           respond(msg.content).catch((err) => log("respond() failed:", err));
         }
         break;
       case "PONG":
+        recordClient({ type: "PONG", echo: msg.echo });
         handlePong(msg.echo);
         break;
       case "TOOL_ACK":
+        recordClient({ type: "TOOL_ACK", call_id: msg.call_id });
         handleAck(msg.call_id);
         break;
       default:
