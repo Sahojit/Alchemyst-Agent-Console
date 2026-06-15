@@ -1,52 +1,43 @@
 @import "tailwindcss";
 
-/* ── Custom scrollbars ── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+/* ── Fonts ── */
+:root {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-/* ── Base ── */
-html,
 body {
-  background: #09090b;
-  color: #f4f4f5;
+  font-family: var(--font-sans);
 }
 
-/* ── Flash animation for bidirectional timeline ↔ chat focus ── */
+code, pre, kbd, .font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ── Dot grid background ── */
+body {
+  background-color: #080809;
+  background-image: radial-gradient(circle, #27272a 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Custom scrollbars ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+/* ── Flash: bidirectional timeline ↔ chat highlight ── */
 .flash-highlight {
   animation: flash-highlight 1.4s ease-out;
 }
 
 @keyframes flash-highlight {
-  0% {
-    box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.9), 0 0 16px rgba(167, 139, 250, 0.3);
-  }
-  100% {
-    box-shadow: 0 0 0 2px rgba(167, 139, 250, 0);
-  }
+  0%   { box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.8), 0 0 20px rgba(139, 92, 246, 0.2); }
+  100% { box-shadow: 0 0 0 2px rgba(139, 92, 246, 0); }
 }
 
-/* ── Typing cursor for streaming text ── */
-.streaming-cursor::after {
-  content: "▍";
-  animation: blink 1s step-start infinite;
-  color: #a78bfa;
-  font-weight: 300;
-  margin-left: 1px;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+/* ── Subtle glow on the header brand mark ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
