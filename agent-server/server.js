@@ -129,7 +129,7 @@ setInterval(() => {
       log(`VIOLATION: no PONG for challenge ${JSON.stringify(challenge)}`);
     }, PONG_GRACE_MS),
   );
-}, 9_000);
+}, 20_000);
 
 function handlePong(echo) {
   const key = typeof echo === "string" ? echo : "";
