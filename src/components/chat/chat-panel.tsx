@@ -36,8 +36,6 @@ export function ChatPanel({ session }: { session: ConsoleSession }) {
     if (el !== null) el.scrollTop = el.scrollHeight;
   };
 
-  // Keep the view pinned while tokens stream — token appends bypass React,
-  // so we follow the TokenSink directly instead of re-render effects.
   useEffect(
     () =>
       session.chat.sink.onAppend(() => {
@@ -46,13 +44,12 @@ export function ChatPanel({ session }: { session: ConsoleSession }) {
     [session],
   );
 
-  // Structural changes (new messages/cards) also keep the pin.
   useEffect(() => {
     if (pinnedRef.current) scrollToBottom();
   }, [chatState]);
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col">
+    <section className="flex min-w-0 flex-1 flex-col bg-zinc-950">
       <div
         ref={scrollRef}
         onScroll={() => {
@@ -61,13 +58,27 @@ export function ChatPanel({ session }: { session: ConsoleSession }) {
           pinnedRef.current =
             el.scrollHeight - el.scrollTop - el.clientHeight < 48;
         }}
-        className="flex-1 overflow-y-auto px-4 py-4"
+        className="flex-1 overflow-y-auto px-4 py-6"
       >
-        <div className="mx-auto flex max-w-3xl flex-col gap-3">
+        <div className="mx-auto flex max-w-2xl flex-col gap-4">
           {chatState.messages.length === 0 && (
-            <p className="py-12 text-center text-sm text-zinc-600">
-              Send a message to start a stream.
-            </p>
+            <div className="flex flex-col items-center gap-3 py-20 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 ring-1 ring-violet-500/30">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none" className="text-violet-400">
+                  <path d="M11 2L19.5 7V15L11 20L2.5 15V7L11 2Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+                  <circle cx="11" cy="11" r="3" fill="currentColor" fillOpacity="0.6" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-zinc-300">Agent is ready</p>
+                <p className="mt-1 text-xs text-zinc-600">
+                  Send a message to start streaming. Try{" "}
+                  <span className="font-mono text-violet-400">/drop</span>,{" "}
+                  <span className="font-mono text-violet-400">/droptool</span>, or{" "}
+                  <span className="font-mono text-violet-400">/error</span> for chaos.
+                </p>
+              </div>
+            </div>
           )}
           {chatState.messages.map((message) => (
             <MessageView key={message.id} message={message} session={session} />
@@ -78,7 +89,7 @@ export function ChatPanel({ session }: { session: ConsoleSession }) {
         onSend={session.sendUserMessage}
         hint={
           isDisconnected(connection)
-            ? "Connection is down — your message will be queued and sent after reconnect."
+            ? "Connection is down — messages will be queued and sent after reconnect."
             : null
         }
       />
@@ -96,22 +107,31 @@ const MessageView = memo(function MessageView({
   switch (message.kind) {
     case "user":
       return (
-        <div className="self-end rounded-lg bg-sky-700 px-3 py-2 text-sm text-white">
-          <span className="whitespace-pre-wrap break-words">
-            {message.content}
-          </span>
+        <div className="flex justify-end">
+          <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-violet-600 to-indigo-600 px-4 py-2.5 text-sm text-white shadow-lg shadow-violet-500/10">
+            <span className="whitespace-pre-wrap break-words leading-relaxed">
+              {message.content}
+            </span>
+          </div>
         </div>
       );
     case "system":
       return (
-        <div
-          className={
-            message.level === "error"
-              ? "self-center rounded border border-rose-900 bg-rose-950/50 px-3 py-1 text-xs text-rose-300"
-              : "self-center rounded border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs text-zinc-400"
-          }
-        >
-          {message.text}
+        <div className="flex justify-center">
+          <div
+            className={
+              message.level === "error"
+                ? "flex items-center gap-2 rounded-lg border border-rose-800/50 bg-rose-950/30 px-3 py-1.5 text-xs text-rose-300"
+                : "flex items-center gap-2 rounded-lg border border-zinc-800/60 bg-zinc-900/50 px-3 py-1.5 text-xs text-zinc-500"
+            }
+          >
+            {message.level === "error" ? (
+              <span className="text-rose-400">⚠</span>
+            ) : (
+              <span className="text-zinc-600">·</span>
+            )}
+            {message.text}
+          </div>
         </div>
       );
     case "agent":
@@ -135,36 +155,49 @@ const AgentMessageView = memo(function AgentMessageView({
   }, [session, message.streamId]);
 
   return (
-    <div
-      ref={containerRef}
-      className="max-w-full self-start rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm leading-relaxed"
-    >
-      <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-zinc-600">
-        <span>agent</span>
-        <span>·</span>
-        <span>{message.streamId}</span>
-        {!message.done && (
-          <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-        )}
+    <div className="flex gap-3">
+      {/* Avatar */}
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/30 to-indigo-500/30 ring-1 ring-violet-500/20">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-violet-400">
+          <path d="M6 1L10.5 3.5V8.5L6 11L1.5 8.5V3.5L6 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+          <circle cx="6" cy="6" r="1.5" fill="currentColor" fillOpacity="0.8" />
+        </svg>
       </div>
-      {/* Segment list is append-only: text segments freeze in place when a
-          tool card lands below them, and post-result tokens always open a
-          NEW segment — earlier DOM is never restructured. */}
-      {message.segments.map((segment) =>
-        segment.kind === "text" ? (
-          <TextSegmentView
-            key={segment.id}
-            segmentId={segment.id}
-            sink={session.chat.sink}
-          />
-        ) : (
-          <ToolCardView
-            key={segment.id}
-            segment={segment}
-            links={session.links}
-          />
-        ),
-      )}
+
+      <div
+        ref={containerRef}
+        className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-zinc-800/60 bg-zinc-900/60 p-4 shadow-sm"
+      >
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
+            Agent
+          </span>
+          <span className="font-mono text-[10px] text-zinc-700">{message.streamId}</span>
+          {!message.done && (
+            <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-emerald-400">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+              streaming
+            </span>
+          )}
+        </div>
+        <div className="text-sm leading-relaxed text-zinc-200">
+          {message.segments.map((segment) =>
+            segment.kind === "text" ? (
+              <TextSegmentView
+                key={segment.id}
+                segmentId={segment.id}
+                sink={session.chat.sink}
+              />
+            ) : (
+              <ToolCardView
+                key={segment.id}
+                segment={segment}
+                links={session.links}
+              />
+            ),
+          )}
+        </div>
+      </div>
     </div>
   );
 });

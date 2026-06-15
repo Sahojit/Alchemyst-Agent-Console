@@ -29,31 +29,41 @@ export interface ContextFocusRequest {
 }
 
 const KIND_LABELS: Record<TimelineRowKind, string> = {
-  tokens: "tokens",
-  tool_call: "tool call",
-  tool_result: "tool result",
-  snapshot: "snapshot",
-  ping: "ping",
-  stream_end: "stream end",
-  error: "error",
-  connection: "connection",
+  tokens: "Tokens",
+  tool_call: "Tool call",
+  tool_result: "Tool result",
+  snapshot: "Snapshot",
+  ping: "Ping",
+  stream_end: "Stream end",
+  error: "Error",
+  connection: "Connection",
 };
 
-/** Stable per-call color so TOOL_CALL ↔ TOOL_RESULT pairs read as linked. */
+const KIND_COLORS: Record<TimelineRowKind, { badge: string; dot: string }> = {
+  tokens: { badge: "bg-zinc-800 text-zinc-400", dot: "bg-zinc-500" },
+  tool_call: { badge: "bg-sky-950/60 text-sky-400 border border-sky-800/40", dot: "bg-sky-400" },
+  tool_result: { badge: "bg-emerald-950/60 text-emerald-400 border border-emerald-800/40", dot: "bg-emerald-400" },
+  snapshot: { badge: "bg-violet-950/60 text-violet-400 border border-violet-800/40", dot: "bg-violet-400" },
+  ping: { badge: "bg-zinc-900 text-zinc-600", dot: "bg-zinc-600" },
+  stream_end: { badge: "bg-zinc-900 text-zinc-500", dot: "bg-zinc-500" },
+  error: { badge: "bg-rose-950/60 text-rose-400 border border-rose-800/40", dot: "bg-rose-400" },
+  connection: { badge: "bg-amber-950/60 text-amber-400 border border-amber-800/40", dot: "bg-amber-400" },
+};
+
 const CALL_COLORS = [
-  "border-sky-400",
-  "border-emerald-400",
-  "border-fuchsia-400",
-  "border-amber-400",
-  "border-rose-400",
-  "border-indigo-400",
+  "border-sky-500/60",
+  "border-emerald-500/60",
+  "border-fuchsia-500/60",
+  "border-amber-500/60",
+  "border-rose-500/60",
+  "border-indigo-500/60",
 ] as const;
 
 function callColor(callId: string): string {
   let hash = 0;
   for (let i = 0; i < callId.length; i++)
     hash = (hash * 31 + callId.charCodeAt(i)) | 0;
-  return CALL_COLORS[Math.abs(hash) % CALL_COLORS.length] ?? "border-sky-400";
+  return CALL_COLORS[Math.abs(hash) % CALL_COLORS.length] ?? "border-sky-500/60";
 }
 
 function rowSearchText(row: TimelineRowModel): string {
@@ -94,9 +104,7 @@ export function TimelinePanel({
     () => new Set(ALL_ROW_KINDS),
   );
   const [search, setSearch] = useState("");
-  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [flashRowId, setFlashRowId] = useState<string | null>(null);
   const followRef = useRef(true);
 
@@ -113,12 +121,11 @@ export function TimelinePanel({
   const virtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 36,
+    estimateSize: () => 38,
     overscan: 12,
     getItemKey: (index) => filtered[index]?.id ?? index,
   });
 
-  // Chat → timeline focus requests, resolved against the CURRENT filter.
   const filteredRef = useRef(filtered);
   filteredRef.current = filtered;
   useEffect(
@@ -140,14 +147,13 @@ export function TimelinePanel({
           setFlashRowId(row.id);
           window.setTimeout(
             () => setFlashRowId((cur) => (cur === row.id ? null : cur)),
-            1600,
+            1400,
           );
         }
       }),
     [session, virtualizer],
   );
 
-  // Auto-follow the newest row unless the user scrolled away.
   useEffect(() => {
     if (followRef.current && filtered.length > 0)
       virtualizer.scrollToIndex(filtered.length - 1, { align: "end" });
@@ -170,64 +176,65 @@ export function TimelinePanel({
         shown={filtered.length}
         total={rows.length}
       />
-      <div
-        ref={parentRef}
-        onScroll={() => {
-          const el = parentRef.current;
-          if (el === null) return;
-          followRef.current =
-            el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-        }}
-        className="min-h-0 flex-1 overflow-y-auto"
-      >
-        <div
-          style={{ height: virtualizer.getTotalSize(), position: "relative" }}
-        >
-          {virtualizer.getVirtualItems().map((item) => {
-            const row = filtered[item.index];
-            if (row === undefined) return null;
-            return (
-              <div
-                key={item.key}
-                data-index={item.index}
-                ref={virtualizer.measureElement}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${item.start}px)`,
-                }}
-              >
-                <TimelineRowView
-                  row={row}
-                  expanded={expandedIds.has(row.id)}
-                  flashing={flashRowId === row.id}
-                  onToggleExpand={() =>
-                    setExpandedIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(row.id)) next.delete(row.id);
-                      else next.add(row.id);
-                      return next;
-                    })
-                  }
-                  onActivate={() => {
-                    if (row.kind === "tokens" || row.kind === "stream_end")
-                      session.links.focusChat(`stream:${row.streamId}`);
-                    else if (
-                      row.kind === "tool_call" ||
-                      row.kind === "tool_result"
-                    )
-                      session.links.focusChat(`tool:${row.callId}`);
-                    else if (row.kind === "snapshot")
-                      onOpenContext({ contextId: row.contextId, seq: row.seq });
-                  }}
-                />
-              </div>
-            );
-          })}
+      {rows.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <p className="text-xs text-zinc-600">No events yet.</p>
         </div>
-      </div>
+      ) : (
+        <div
+          ref={parentRef}
+          onScroll={() => {
+            const el = parentRef.current;
+            if (el === null) return;
+            followRef.current =
+              el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+          }}
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
+          <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+            {virtualizer.getVirtualItems().map((item) => {
+              const row = filtered[item.index];
+              if (row === undefined) return null;
+              return (
+                <div
+                  key={item.key}
+                  data-index={item.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${item.start}px)`,
+                  }}
+                >
+                  <TimelineRowView
+                    row={row}
+                    expanded={expandedIds.has(row.id)}
+                    flashing={flashRowId === row.id}
+                    onToggleExpand={() =>
+                      setExpandedIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(row.id)) next.delete(row.id);
+                        else next.add(row.id);
+                        return next;
+                      })
+                    }
+                    onActivate={() => {
+                      if (row.kind === "tokens" || row.kind === "stream_end")
+                        session.links.focusChat(`stream:${row.streamId}`);
+                      else if (row.kind === "tool_call" || row.kind === "tool_result")
+                        session.links.focusChat(`tool:${row.callId}`);
+                      else if (row.kind === "snapshot")
+                        onOpenContext({ contextId: row.contextId, seq: row.seq });
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -248,33 +255,50 @@ function FilterBar({
   total: number;
 }) {
   return (
-    <div className="border-b border-zinc-800 p-2">
-      <input
-        type="search"
-        value={search}
-        onChange={(e) => onSearch(e.target.value)}
-        placeholder={`Search ${total} events…`}
-        className="mb-2 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-sky-500 focus:outline-none"
-      />
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
-        {ALL_ROW_KINDS.map((kind) => (
-          <label
-            key={kind}
-            className="flex cursor-pointer items-center gap-1 text-xs text-zinc-400"
-          >
-            <input
-              type="checkbox"
-              checked={enabledKinds.has(kind)}
-              onChange={() => onToggle(kind)}
-              className="accent-sky-500"
-            />
-            {KIND_LABELS[kind]}
-          </label>
-        ))}
+    <div className="space-y-2 border-b border-zinc-800/80 bg-zinc-950 p-2.5">
+      <div className="relative">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="none"
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600"
+        >
+          <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.2" />
+          <path d="M8 8l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          placeholder={`Search ${total} events…`}
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 py-1.5 pl-7 pr-3 text-xs text-zinc-300 placeholder:text-zinc-600 focus:border-violet-500/60 focus:outline-none focus:ring-1 focus:ring-violet-500/20"
+        />
       </div>
-      <div className="mt-1 text-right text-[10px] text-zinc-600">
-        {shown}/{total} rows
+      <div className="flex flex-wrap gap-1">
+        {ALL_ROW_KINDS.map((kind) => {
+          const on = enabledKinds.has(kind);
+          const { badge, dot } = KIND_COLORS[kind];
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={() => onToggle(kind)}
+              className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-opacity ${
+                on ? badge : "bg-zinc-900 text-zinc-600 opacity-50"
+              }`}
+            >
+              <span className={`inline-block h-1 w-1 rounded-full ${on ? dot : "bg-zinc-600"}`} />
+              {KIND_LABELS[kind]}
+            </button>
+          );
+        })}
       </div>
+      {search !== "" && (
+        <p className="text-right text-[10px] text-zinc-600">
+          {shown} / {total} events
+        </p>
+      )}
     </div>
   );
 }
@@ -297,26 +321,47 @@ const TimelineRowView = memo(function TimelineRowView({
     row.kind === "tool_call" ||
     row.kind === "tool_result";
   const linked = row.kind === "tool_call" || row.kind === "tool_result";
+  const { dot } = KIND_COLORS[row.kind];
 
   return (
     <div
-      className={`border-b border-zinc-900 px-2 py-1.5 text-xs ${
-        flashing ? "bg-amber-900/40" : "hover:bg-zinc-900/70"
-      } ${linked ? `ml-3 border-l-2 ${callColor(row.callId)}` : ""}`}
+      className={`border-b border-zinc-900/60 text-xs transition-colors ${
+        flashing
+          ? "bg-violet-900/20"
+          : "hover:bg-zinc-900/40"
+      } ${linked ? `border-l-2 pl-1 ${callColor(row.callId)}` : "pl-0"}`}
     >
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-start gap-1.5 px-2.5 py-2">
+        {/* Expand toggle */}
         {expandable ? (
           <button
             type="button"
             onClick={onToggleExpand}
-            className="mt-0.5 w-3 shrink-0 text-zinc-500 hover:text-zinc-200"
-            aria-label={expanded ? "collapse" : "expand"}
+            className="mt-px w-3 shrink-0 text-zinc-600 transition-colors hover:text-zinc-300"
           >
-            {expanded ? "▾" : "▸"}
+            <svg
+              width="8"
+              height="8"
+              viewBox="0 0 8 8"
+              fill="none"
+              className={`transition-transform ${expanded ? "rotate-90" : ""}`}
+            >
+              <path
+                d="M2 1.5l3 2.5-3 2.5"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
         ) : (
-          <span className="w-3 shrink-0" />
+          <span className="mt-px w-3 shrink-0 text-center">
+            <span className={`inline-block h-1 w-1 rounded-full ${dot}`} />
+          </span>
         )}
+
+        {/* Main content */}
         <button
           type="button"
           onClick={onActivate}
@@ -324,15 +369,18 @@ const TimelineRowView = memo(function TimelineRowView({
         >
           <RowSummary row={row} />
         </button>
-        <span className="shrink-0 font-mono text-[10px] text-zinc-600">
+
+        {/* Timestamp */}
+        <span className="shrink-0 font-mono text-[10px] text-zinc-700">
           {row.kind === "tokens"
             ? `#${row.firstSeq}–${row.lastSeq} ${formatClock(row.endedAt)}`
             : `${"seq" in row ? `#${row.seq} ` : ""}${formatClock(row.at)}`}
         </span>
       </div>
+
       {expanded && (
-        <div className="mt-1 pl-4">
-          <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded bg-zinc-950 p-2 font-mono text-[11px] text-zinc-300">
+        <div className="mx-2.5 mb-2 overflow-hidden rounded-lg border border-zinc-800/60 bg-zinc-950">
+          <pre className="max-h-52 overflow-y-auto p-2.5 font-mono text-[11px] leading-relaxed text-zinc-300">
             {row.kind === "tokens"
               ? row.text
               : row.kind === "tool_call"
@@ -351,64 +399,69 @@ function RowSummary({ row }: { row: TimelineRowModel }) {
   switch (row.kind) {
     case "tokens":
       return (
-        <span className="text-zinc-300">
-          <span className="text-zinc-500">▍</span> Streamed{" "}
-          <span className="font-semibold">{row.count}</span> token
-          {row.count === 1 ? "" : "s"} (
-          {formatDurationMs(row.endedAt - row.startedAt)}) ·{" "}
-          <span className="text-zinc-500">
-            {truncate(row.text.replaceAll("\n", " "), 48)}
-          </span>
+        <span className="text-zinc-400">
+          <span className="mr-1 text-zinc-700">▍</span>
+          <span className="font-medium text-zinc-300">{row.count}</span> token
+          {row.count === 1 ? "" : "s"}{" "}
+          <span className="text-zinc-600">({formatDurationMs(row.endedAt - row.startedAt)})</span>
+          {" · "}
+          <span className="text-zinc-600">{truncate(row.text.replaceAll("\n", " "), 44)}</span>
         </span>
       );
     case "tool_call":
       return (
         <span className="text-sky-300">
-          🔧 TOOL_CALL <span className="font-mono">{row.toolName}</span>{" "}
-          <span className="font-mono text-[10px] text-zinc-500">
-            {row.callId}
-          </span>
+          <span className="mr-1 text-sky-600">⟨fn⟩</span>
+          <span className="font-mono font-semibold">{row.toolName}</span>{" "}
+          <span className="font-mono text-[10px] text-zinc-600">{row.callId}</span>
         </span>
       );
     case "tool_result":
       return (
         <span className="text-emerald-300">
-          ↩ TOOL_RESULT{" "}
-          <span className="font-mono text-[10px] text-zinc-500">
-            {row.callId}
-          </span>{" "}
+          <span className="mr-1 text-emerald-600">↩</span>
+          <span className="font-mono text-[10px] text-zinc-600">{row.callId}</span>{" "}
           <span className="text-zinc-500">
-            {truncate(safeStringify(row.result).replaceAll("\n", " "), 40)}
+            {truncate(safeStringify(row.result).replaceAll("\n", " "), 36)}
           </span>
         </span>
       );
     case "snapshot":
       return (
         <span className="text-violet-300">
-          📸 CONTEXT_SNAPSHOT{" "}
+          <span className="mr-1 text-violet-600">◈</span>
           <span className="font-mono">{row.contextId}</span>{" "}
-          <span className="text-zinc-500">({formatBytes(row.bytes)})</span>
+          <span className="text-zinc-600">({formatBytes(row.bytes)})</span>
         </span>
       );
     case "ping":
       return (
-        <span className={row.corrupt ? "text-rose-400" : "text-zinc-500"}>
-          ● PING {row.corrupt ? "(corrupt challenge)" : ""}
+        <span className={row.corrupt ? "text-rose-400" : "text-zinc-600"}>
+          <span className="mr-1">◦</span>
+          PING{row.corrupt ? " — corrupt challenge" : ""}
         </span>
       );
     case "stream_end":
       return (
-        <span className="text-zinc-400">
-          ■ STREAM_END <span className="font-mono">{row.streamId}</span>
+        <span className="text-zinc-500">
+          <span className="mr-1">■</span>
+          Stream ended{" "}
+          <span className="font-mono text-zinc-600">{row.streamId}</span>
         </span>
       );
     case "error":
       return (
         <span className="text-rose-400">
-          ⚠ ERROR {row.code}: {row.message}
+          <span className="mr-1">⚠</span>
+          {row.code}: {row.message}
         </span>
       );
     case "connection":
-      return <span className="italic text-amber-300/80">{row.label}</span>;
+      return (
+        <span className="italic text-amber-300/80">
+          <span className="mr-1 not-italic text-amber-600">◉</span>
+          {row.label}
+        </span>
+      );
   }
 }

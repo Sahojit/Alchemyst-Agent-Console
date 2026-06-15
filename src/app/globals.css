@@ -1,15 +1,52 @@
 @import "tailwindcss";
 
-/* Bidirectional chat ↔ timeline focus flash (see LinkRegistry). */
+/* ── Custom scrollbars ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* ── Base ── */
+html,
+body {
+  background: #09090b;
+  color: #f4f4f5;
+}
+
+/* ── Flash animation for bidirectional timeline ↔ chat focus ── */
 .flash-highlight {
-  animation: flash-highlight 1.6s ease-out;
+  animation: flash-highlight 1.4s ease-out;
 }
 
 @keyframes flash-highlight {
   0% {
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.9);
+    box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.9), 0 0 16px rgba(167, 139, 250, 0.3);
   }
   100% {
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 2px rgba(167, 139, 250, 0);
   }
+}
+
+/* ── Typing cursor for streaming text ── */
+.streaming-cursor::after {
+  content: "▍";
+  animation: blink 1s step-start infinite;
+  color: #a78bfa;
+  font-weight: 300;
+  margin-left: 1px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
