@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: alchemyst-agent-server
+    runtime: node
+    rootDir: agent-server
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: MODE
+        value: normal
+    healthCheckPath: /health

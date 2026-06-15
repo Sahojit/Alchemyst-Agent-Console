@@ -24,6 +24,7 @@
  * per-connection: reconnecting clients send RESUME { last_seq } and get an
  * in-order replay of everything after it.
  */
+import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import crypto from "node:crypto";
 
@@ -31,7 +32,7 @@ const args = process.argv.slice(2);
 const modeIdx = args.indexOf("--mode");
 const MODE = modeIdx >= 0 ? args[modeIdx + 1] : process.env.MODE || "normal";
 const CHAOS = MODE === "chaos";
-const PORT = 4747;
+const PORT = Number(process.env.PORT ?? 4747);
 
 const log = (...xs) => console.log(new Date().toISOString(), ...xs);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -306,9 +307,23 @@ async function respond(content) {
 }
 
 // --------------------------------------------------------------------------
-// WebSocket server
+// HTTP + WebSocket server
 // --------------------------------------------------------------------------
-const wss = new WebSocketServer({ port: PORT, path: "/ws" });
+const httpServer = createServer((req, res) => {
+  // Health check endpoint for Render / load balancers
+  if (req.method === "GET" && req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, mode: MODE }));
+    return;
+  }
+  res.writeHead(404);
+  res.end("Not found");
+});
+
+const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+httpServer.listen(PORT, () => {
+  log(`mock agent server listening on ws://localhost:${PORT}/ws (mode=${MODE})`);
+});
 
 wss.on("connection", (ws) => {
   log(`client connected (mode=${MODE})`);
@@ -364,5 +379,3 @@ if (CHAOS) {
     if (active && Math.random() < 0.25) dropActive("chaos");
   }, 15_000);
 }
-
-log(`mock agent server listening on ws://localhost:${PORT}/ws (mode=${MODE})`);

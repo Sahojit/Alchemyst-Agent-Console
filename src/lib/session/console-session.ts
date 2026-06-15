@@ -13,7 +13,8 @@ import { ExternalStore } from "./external-store";
 import { LinkRegistry } from "./link-registry";
 import { TimelineStore } from "./timeline-store";
 
-export const AGENT_WS_URL = "ws://localhost:4747/ws";
+export const AGENT_WS_URL =
+  process.env.NEXT_PUBLIC_AGENT_WS_URL ?? "ws://localhost:4747/ws";
 
 export interface ConsoleSession {
   readonly chat: ChatStore;
